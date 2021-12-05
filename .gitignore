@@ -2,4 +2,5 @@ build
 components/micro_ros_espidf_component
 components/esp32-camera
 sdkconfig.old
+sdkconfig
 *~

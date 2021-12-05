@@ -42,6 +42,8 @@ void micro_ros_task(void * arg)
 	rcl_init_options_t init_options = rcl_get_zero_initialized_init_options();
 	RCCHECK(rcl_init_options_init(&init_options, allocator));
 
+        printf("micro_ros_task ...\n");
+
 #ifdef CONFIG_MICRO_ROS_ESP_XRCE_DDS_MIDDLEWARE
 	rmw_init_options_t* rmw_options = rcl_init_options_get_rmw_init_options(&init_options);
 
@@ -50,12 +52,18 @@ void micro_ros_task(void * arg)
 	//RCCHECK(rmw_uros_discover_agent(rmw_options));
 #endif
 
+        printf("micro_ros_task ...\n");
+
 	// create init_options
 	RCCHECK(rclc_support_init_with_options(&support, 0, NULL, &init_options, &allocator));
+
+        printf("micro_ros_task ...\n");
 
 	// create node
 	rcl_node_t node;
 	RCCHECK(rclc_node_init_default(&node, "esp32_int32_publisher", "", &support));
+
+        printf("micro_ros_task ...\n");
 
 	// create publisher
 	RCCHECK(rclc_publisher_init_default(
@@ -63,6 +71,8 @@ void micro_ros_task(void * arg)
 		&node,
 		ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, Int32),
 		"freertos_int32_publisher"));
+
+        printf("micro_ros_task ...\n");
 
 	// create timer,
 	rcl_timer_t timer;
@@ -73,12 +83,16 @@ void micro_ros_task(void * arg)
 		RCL_MS_TO_NS(timer_timeout),
 		timer_callback));
 
+        printf("micro_ros_task ...\n");
+
 	// create executor
 	rclc_executor_t executor;
 	RCCHECK(rclc_executor_init(&executor, &support.context, 1, &allocator));
 	RCCHECK(rclc_executor_add_timer(&executor, &timer));
 
 	msg.data = 0;
+
+        printf("micro_ros_task ... loop ...\n");
 
 	while(1){
 		rclc_executor_spin_some(&executor, RCL_MS_TO_NS(100));
