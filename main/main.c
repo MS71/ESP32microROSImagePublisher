@@ -21,7 +21,8 @@
 #include <micro_ros_utilities/type_utilities.h>
 #include <micro_ros_utilities/string_utilities.h>
 
-#include <sensor_msgs/msg/image.h>
+//#include <sensor_msgs/msg/image.h>
+#include <sensor_msgs/msg/compressed_image.h>
 
 #define RCCHECK(fn) { rcl_ret_t temp_rc = fn; if((temp_rc != RCL_RET_OK)){printf("Failed status on line %d: %d. Aborting.\n",__LINE__,(int)temp_rc);vTaskDelete(NULL);}}
 #define RCSOFTCHECK(fn) { rcl_ret_t temp_rc = fn; if((temp_rc != RCL_RET_OK)){printf("Failed status on line %d: %d. Continuing.\n",__LINE__,(int)temp_rc);}}
@@ -102,7 +103,8 @@ static camera_config_t camera_config = {
     .ledc_timer = LEDC_TIMER_0,
     .ledc_channel = LEDC_CHANNEL_0,
 
-    .pixel_format = PIXFORMAT_RGB565, //YUV422,GRAYSCALE,RGB565,JPEG
+    //.pixel_format = PIXFORMAT_RGB565, //YUV422,GRAYSCALE,RGB565,JPEG
+    .pixel_format = PIXFORMAT_JPEG, //YUV422,GRAYSCALE,RGB565,JPEG
     .frame_size = FRAMESIZE_QVGA,    //QQVGA-UXGA Do not use sizes above QVGA when not JPEG
 
     .jpeg_quality = 12, //0-63 lower number means higher quality
@@ -124,10 +126,10 @@ static esp_err_t init_camera()
 }
 
 rcl_publisher_t publisher;
-sensor_msgs__msg__Image msg;
-sensor_msgs__msg__Image msg_static;
+//sensor_msgs__msg__Image msg;
+sensor_msgs__msg__CompressedImage msg_static;
 
-uint8_t my_buffer[1000];
+//uint8_t my_buffer[10000];
 
 void timer_callback(rcl_timer_t * timer, int64_t last_call_time)
 {
@@ -136,12 +138,22 @@ void timer_callback(rcl_timer_t * timer, int64_t last_call_time)
         	ESP_LOGI(TAG, "Taking picture...");
         	camera_fb_t *pic = esp_camera_fb_get();
 
-        	// use pic->buf to access the image
-        	ESP_LOGI(TAG, "Picture taken! Its size was: %zu bytes", pic->len);
-        	esp_camera_fb_return(pic);
+		if( pic->len <= msg_static.data.capacity )
+		{
+			// use pic->buf to access the image
+			msg_static.data.size = pic->len;
+			ESP_LOGI(TAG, "Picture taken! Its size was: %zu bytes %d %d %d %d %p", 
+				pic->len,pic->width,pic->height,
+				msg_static.data.size,msg_static.data.capacity,msg_static.data.data);
+			
+			msg_static.header.frame_id = micro_ros_string_utilities_set(msg_static.header.frame_id, "myframe");
+			msg_static.format = micro_ros_string_utilities_set(msg_static.format, "JPEG");
+			memcpy(msg_static.data.data,pic->buf,pic->len);
 
-		RCSOFTCHECK(rcl_publish(&publisher, &msg, NULL));
-		RCSOFTCHECK(rcl_publish(&publisher, &msg_static, NULL));
+			RCSOFTCHECK(rcl_publish(&publisher, &msg_static, NULL));
+		}
+		
+		esp_camera_fb_return(pic);
 	}
 }
 
@@ -171,7 +183,7 @@ void micro_ros_task(void * arg)
 	RCCHECK(rclc_publisher_init_default(
 		&publisher,
 		&node,
-    	ROSIDL_GET_MSG_TYPE_SUPPORT(sensor_msgs, msg, Image),
+    	ROSIDL_GET_MSG_TYPE_SUPPORT(sensor_msgs, msg, CompressedImage),
 		"esp32_publisher"));
 
 	// create timer,
@@ -196,7 +208,7 @@ void micro_ros_task(void * arg)
 	// If some member of this struct is set to zero, the library will use the default value.
 	// Check `micro_ros_utilities_memory_conf_default` in `<micro_ros_utilities/type_utilities.h>` for those defaults.
 
-	static micro_ros_utilities_memory_conf_t conf = {0};
+	static micro_ros_utilities_memory_conf_t conf = {};
 
 	// OPTIONALLY this struct can configure the default size of strings, basic sequences and composed sequences
 
@@ -209,30 +221,17 @@ void micro_ros_task(void * arg)
 
 	micro_ros_utilities_memory_rule_t rules[] = {
 		{"header.frame_id", 30},
-		{"encoding", 3},
-		{"data", 400}
+		{"format", 4},
+		{"data", 10000}
 	};
 	conf.rules = rules;
 	conf.n_rules = sizeof(rules) / sizeof(rules[0]);
 
-	// --- API ---
-	// It can be calculated the size that will be needed by a msg with a certain configuration
-
-	size_t dynamic_size = micro_ros_utilities_get_dynamic_size(
-		ROSIDL_GET_MSG_TYPE_SUPPORT(sensor_msgs, msg, Image),
-		conf
-	);
-
-	// The total (stack, static & dynamic) memory usage of a packet will be:
-
-	size_t message_total_size = dynamic_size + sizeof(sensor_msgs__msg__Image);
-
-	// The message dynamic memory can be allocated using the following call.
-	// This will use rcutils default allocators for getting memory.
-
-	bool success = micro_ros_utilities_create_message_memory(
-		ROSIDL_GET_MSG_TYPE_SUPPORT(sensor_msgs, msg, Image),
-		&msg,
+	//bool success;
+	
+	micro_ros_utilities_create_message_memory(
+		ROSIDL_GET_MSG_TYPE_SUPPORT(sensor_msgs, msg, CompressedImage),
+		&msg_static,
 		conf
 	);
 
@@ -241,23 +240,23 @@ void micro_ros_task(void * arg)
 	// If no rules set in the conf, no dynamic allocation is guaranteed.
 	// This method will use contiguos memory and will not take into account aligment
 	// so handling statically allocated msg can be less efficient that dynamic ones
-
+#if 0
 	size_t static_size = micro_ros_utilities_get_static_size(
 		ROSIDL_GET_MSG_TYPE_SUPPORT(sensor_msgs, msg, Image),
 		conf
 	);
-
-	message_total_size = static_size + sizeof(sensor_msgs__msg__Image);
-
+#endif
+	//size_t message_total_size = static_size + sizeof(sensor_msgs__msg__Image);
+#if 0
 	// my_buffer should have at least static_size Bytes
-	success &= micro_ros_utilities_create_static_message_memory(
-		ROSIDL_GET_MSG_TYPE_SUPPORT(sensor_msgs, msg, Image),
+	micro_ros_utilities_create_static_message_memory(
+		ROSIDL_GET_MSG_TYPE_SUPPORT(sensor_msgs, msg, CompressedImage),
 		&msg_static,
 		conf,
 		my_buffer,
 		sizeof(my_buffer)
 	);
-
+#endif
 	// Dynamically allocated messages can be destroyed using:
 
 	// success &= micro_ros_utilities_destroy_message_memory(
@@ -266,22 +265,6 @@ void micro_ros_task(void * arg)
 	//   conf
 	// );
 
-	// Fill the message
-	msg.header.frame_id = micro_ros_string_utilities_set(msg.header.frame_id, "myframe");
-	msg_static.header.frame_id = micro_ros_string_utilities_set(msg_static.header.frame_id, "myframestatic");
-
-	msg.height = msg_static.height = 10;
-	msg.width = msg_static.width = 40;
-
-	msg.encoding = micro_ros_string_utilities_set(msg.encoding, "RGB");
-	msg_static.encoding = micro_ros_string_utilities_set(msg_static.encoding, "RGB");
-
-	msg.data.size = msg_static.data.size = 400;
-	for (size_t i = 0; i < msg.data.size; i++)
-	{
-		msg.data.data[i] = i;
-		msg_static.data.data[i] = i;
-	}
 	// spin executor
 	while(1){
 		rclc_executor_spin_some(&executor, RCL_MS_TO_NS(100));
