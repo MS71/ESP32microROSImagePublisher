@@ -107,7 +107,7 @@ static camera_config_t camera_config = {
     .pixel_format = PIXFORMAT_JPEG, //YUV422,GRAYSCALE,RGB565,JPEG
     .frame_size = FRAMESIZE_QVGA,    //QQVGA-UXGA Do not use sizes above QVGA when not JPEG
 
-    .jpeg_quality = 12, //0-63 lower number means higher quality
+    .jpeg_quality = 63, //0-63 lower number means higher quality
     .fb_count = 1,       //if more than one, i2s runs in continuous mode. Use only with JPEG
     .grab_mode = CAMERA_GRAB_WHEN_EMPTY,
 };
@@ -221,8 +221,8 @@ void micro_ros_task(void * arg)
 
 	micro_ros_utilities_memory_rule_t rules[] = {
 		{"header.frame_id", 30},
-		{"format", 4},
-		{"data", 10000}
+		{"format",4},
+		{"data", 3000}
 	};
 	conf.rules = rules;
 	conf.n_rules = sizeof(rules) / sizeof(rules[0]);
