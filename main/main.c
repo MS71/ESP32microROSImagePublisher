@@ -111,7 +111,7 @@ static camera_config_t camera_config = {
     .frame_size = FRAMESIZE_QVGA,    //QQVGA-UXGA Do not use sizes above QVGA when not JPEG
 
     .jpeg_quality = 4, //0-63 lower number means higher quality
-    .fb_count = 1,       //if more than one, i2s runs in continuous mode. Use only with JPEG
+    .fb_count = 2,       //if more than one, i2s runs in continuous mode. Use only with JPEG
     .grab_mode = CAMERA_GRAB_WHEN_EMPTY,
 };
 
@@ -145,6 +145,7 @@ void timer_callback(rcl_timer_t * timer, int64_t last_call_time)
 			// use pic->buf to access the image
 			msg_static.data.size = pic->len;
 			memcpy(msg_static.data.data,pic->buf,pic->len);
+			#if 1
 			ESP_LOGI(TAG, "Picture taken! Its size was: %zu bytes %d %d %d %d %p %02x%02x%02x%02x%02x%02x%02x%02x", 
 				pic->len,pic->width,pic->height,
 				msg_static.data.size,msg_static.data.capacity,msg_static.data.data,
@@ -156,7 +157,7 @@ void timer_callback(rcl_timer_t * timer, int64_t last_call_time)
 				msg_static.data.data[5],
 				msg_static.data.data[6],
 				msg_static.data.data[7]);
-			
+			#endif
 			msg_static.header.frame_id = micro_ros_string_utilities_set(msg_static.header.frame_id, "myframe");
 			msg_static.format = micro_ros_string_utilities_set(msg_static.format, "jpeg");
 			
@@ -208,7 +209,7 @@ void micro_ros_task(void * arg)
 
 	// create timer,
 	rcl_timer_t timer;
-	const unsigned int timer_timeout = 500;
+	const unsigned int timer_timeout = 20;
 	RCCHECK(rclc_timer_init_default(
 		&timer,
 		&support,
@@ -242,7 +243,7 @@ void micro_ros_task(void * arg)
 	micro_ros_utilities_memory_rule_t rules[] = {
 		{"header.frame_id", 30},
 		{"format",4},
-		{"data", 15000}
+		{"data", 20000}
 	};
 	conf.rules = rules;
 	conf.n_rules = sizeof(rules) / sizeof(rules[0]);
