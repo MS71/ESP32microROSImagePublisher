@@ -57,6 +57,8 @@
 // ESP32Cam (AiThinker) PIN Map
 #ifdef BOARD_ESP32CAM_AITHINKER
 
+#define FLASH_GPIO 4
+
 #define CAM_PIN_PWDN 32
 #define CAM_PIN_RESET -1 //software reset will be performed
 #define CAM_PIN_XCLK 0
@@ -105,9 +107,10 @@ static camera_config_t camera_config = {
 
     //.pixel_format = PIXFORMAT_RGB565, //YUV422,GRAYSCALE,RGB565,JPEG
     .pixel_format = PIXFORMAT_JPEG, //YUV422,GRAYSCALE,RGB565,JPEG
+    //.frame_size = FRAMESIZE_QVGA,    //QQVGA-UXGA Do not use sizes above QVGA when not JPEG
     .frame_size = FRAMESIZE_QVGA,    //QQVGA-UXGA Do not use sizes above QVGA when not JPEG
 
-    .jpeg_quality = 63, //0-63 lower number means higher quality
+    .jpeg_quality = 4, //0-63 lower number means higher quality
     .fb_count = 1,       //if more than one, i2s runs in continuous mode. Use only with JPEG
     .grab_mode = CAMERA_GRAB_WHEN_EMPTY,
 };
@@ -126,39 +129,56 @@ static esp_err_t init_camera()
 }
 
 rcl_publisher_t publisher;
-//sensor_msgs__msg__Image msg;
 sensor_msgs__msg__CompressedImage msg_static;
-
-//uint8_t my_buffer[10000];
 
 void timer_callback(rcl_timer_t * timer, int64_t last_call_time)
 {
 	RCLC_UNUSED(last_call_time);
 	if (timer != NULL) {
-        	ESP_LOGI(TAG, "Taking picture...");
+    		//gpio_set_level(FLASH_GPIO, 1);
         	camera_fb_t *pic = esp_camera_fb_get();
-
-		if( pic->len <= msg_static.data.capacity )
+    		//gpio_set_level(FLASH_GPIO, 0);
+		if( pic != NULL )
 		{
+		  if( pic->len <= msg_static.data.capacity )
+		  {
 			// use pic->buf to access the image
 			msg_static.data.size = pic->len;
-			ESP_LOGI(TAG, "Picture taken! Its size was: %zu bytes %d %d %d %d %p", 
+			memcpy(msg_static.data.data,pic->buf,pic->len);
+			ESP_LOGI(TAG, "Picture taken! Its size was: %zu bytes %d %d %d %d %p %02x%02x%02x%02x%02x%02x%02x%02x", 
 				pic->len,pic->width,pic->height,
-				msg_static.data.size,msg_static.data.capacity,msg_static.data.data);
+				msg_static.data.size,msg_static.data.capacity,msg_static.data.data,
+				msg_static.data.data[0],
+				msg_static.data.data[1],
+				msg_static.data.data[2],
+				msg_static.data.data[3],
+				msg_static.data.data[4],
+				msg_static.data.data[5],
+				msg_static.data.data[6],
+				msg_static.data.data[7]);
 			
 			msg_static.header.frame_id = micro_ros_string_utilities_set(msg_static.header.frame_id, "myframe");
-			msg_static.format = micro_ros_string_utilities_set(msg_static.format, "JPEG");
-			memcpy(msg_static.data.data,pic->buf,pic->len);
-
+			msg_static.format = micro_ros_string_utilities_set(msg_static.format, "jpeg");
+			
 			RCSOFTCHECK(rcl_publish(&publisher, &msg_static, NULL));
-		}
+		  }
+		  else
+		  {
+			ESP_LOGE(TAG, "Picture taken! Its size was: %zu bytes %d %d", 
+				pic->len,pic->width,pic->height);
+		  }
 		
-		esp_camera_fb_return(pic);
+		  esp_camera_fb_return(pic);
+		}
+		else
+		{
+			ESP_LOGE(TAG, "Picture not taken!");
+		} 
 	}
 }
 
 void micro_ros_task(void * arg)
-{
+{ 
 	rcl_allocator_t allocator = rcl_get_default_allocator();
 	rclc_support_t support;
 
@@ -177,18 +197,18 @@ void micro_ros_task(void * arg)
 
 	// create node
 	rcl_node_t node;
-	RCCHECK(rclc_node_init_default(&node, "esp32_node", "", &support));
+	RCCHECK(rclc_node_init_default(&node, "esp32cam", "", &support));
 
 	// create publisher
 	RCCHECK(rclc_publisher_init_default(
 		&publisher,
 		&node,
     	ROSIDL_GET_MSG_TYPE_SUPPORT(sensor_msgs, msg, CompressedImage),
-		"esp32_publisher"));
+		"image/compressed"));
 
 	// create timer,
 	rcl_timer_t timer;
-	const unsigned int timer_timeout = 1000;
+	const unsigned int timer_timeout = 500;
 	RCCHECK(rclc_timer_init_default(
 		&timer,
 		&support,
@@ -222,48 +242,16 @@ void micro_ros_task(void * arg)
 	micro_ros_utilities_memory_rule_t rules[] = {
 		{"header.frame_id", 30},
 		{"format",4},
-		{"data", 3000}
+		{"data", 15000}
 	};
 	conf.rules = rules;
 	conf.n_rules = sizeof(rules) / sizeof(rules[0]);
-
-	//bool success;
 	
 	micro_ros_utilities_create_message_memory(
 		ROSIDL_GET_MSG_TYPE_SUPPORT(sensor_msgs, msg, CompressedImage),
 		&msg_static,
 		conf
 	);
-
-	// The message dynamic memory can also be allocated using a buffer.
-	// This will NOT use dynamic memory for the allocation.
-	// If no rules set in the conf, no dynamic allocation is guaranteed.
-	// This method will use contiguos memory and will not take into account aligment
-	// so handling statically allocated msg can be less efficient that dynamic ones
-#if 0
-	size_t static_size = micro_ros_utilities_get_static_size(
-		ROSIDL_GET_MSG_TYPE_SUPPORT(sensor_msgs, msg, Image),
-		conf
-	);
-#endif
-	//size_t message_total_size = static_size + sizeof(sensor_msgs__msg__Image);
-#if 0
-	// my_buffer should have at least static_size Bytes
-	micro_ros_utilities_create_static_message_memory(
-		ROSIDL_GET_MSG_TYPE_SUPPORT(sensor_msgs, msg, CompressedImage),
-		&msg_static,
-		conf,
-		my_buffer,
-		sizeof(my_buffer)
-	);
-#endif
-	// Dynamically allocated messages can be destroyed using:
-
-	// success &= micro_ros_utilities_destroy_message_memory(
-	//   ROSIDL_GET_MSG_TYPE_SUPPORT(control_msgs, msg, JointJog),
-	//   &msg,
-	//   conf
-	// );
 
 	// spin executor
 	while(1){
@@ -284,9 +272,15 @@ void app_main(void)
     ESP_ERROR_CHECK(uros_network_interface_initialize());
 #endif
 
+#if 1
     if(ESP_OK != init_camera()) {
         return;
     }
+#endif
+
+    //gpio_reset_pin(FLASH_GPIO);
+    //gpio_set_direction(FLASH_GPIO, GPIO_MODE_OUTPUT);
+    //gpio_set_level(FLASH_GPIO, 0);
 
     //pin micro-ros task in APP_CPU to make PRO_CPU to deal with wifi:
     xTaskCreate(micro_ros_task,
@@ -296,3 +290,4 @@ void app_main(void)
             CONFIG_MICRO_ROS_APP_TASK_PRIO,
             NULL);
 }
+
