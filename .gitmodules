@@ -1,0 +1,7 @@
+ 
+[submodule "components/esp32-camera"]
+	path = components/esp32-camera
+	url = https://github.com/espressif/esp32-camera.git
+[submodule "components/micro_ros_espidf_component"]
+	path = components/micro_ros_espidf_component
+	url = https://github.com/micro-ROS/micro_ros_espidf_component.git
