@@ -6,7 +6,6 @@
 
 * git clone https://github.com/MS71/ESP32microROSImagePublisher.git
 * cd ESP32microROSImagePublisher
-* ESP32microROSImagePublisher/components$ git clone https://github.com/micro-ROS/micro_ros_espidf_component.git 
 * ESP32microROSImagePublisher$ idf.py menuconfig
 * 1.) change “micro ROS middleware to micro-ROS over embeddedRTPS”
 * 2.) enter WIFI name and password

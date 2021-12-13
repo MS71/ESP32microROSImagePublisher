@@ -1,3 +1,0 @@
-git clone https://github.com/micro-ROS/micro_ros_espidf_component.git
-git clone https://github.com/espressif/esp32-camera.git
-
