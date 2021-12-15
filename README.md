@@ -5,8 +5,13 @@
 * esp-idf$ . ./export.sh 
 * pip3 install catkin_pkg lark-parser empy colcon-common-extensions importlib-resources
 
+
+
 * git clone https://github.com/MS71/ESP32microROSImagePublisher.git
-* cd ESP32microROSImagePublisher
+* cd ESP32microROSImagePublisher/
+* git submodule init
+* git submodule update
+* idf.py set-target esp32
 * ESP32microROSImagePublisher$ idf.py menuconfig
 * 1.) change “micro ROS middleware to micro-ROS over embeddedRTPS”
 * 2.) enter WIFI name and password
