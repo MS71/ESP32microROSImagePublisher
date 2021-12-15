@@ -1,4 +1,5 @@
 # Env Setup
+
 * git clone -b v4.3.1  --recursive https://github.com/espressif/esp-idf.git esp-idf
 * esp-idf$ ./install.sh
 * esp-idf$ . ./export.sh 
